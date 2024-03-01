@@ -1,0 +1,67 @@
+import numpy as np
+import imutils
+import cv2
+#define os limites inferior e superior das cores no espaço de cores HSV
+lower = {'red': (166, 84, 141),
+'blue': (97, 100, 117),
+'yellow': (23, 59, 119)}
+upper = {'red': (186, 255, 255),
+'blue': (117, 255, 255),
+'yellow': (54, 255, 255)}
+#define cores padrão para o círculo ao redor do objeto
+colors = {'red': (0, 0, 255),
+'blue': (255, 0, 0),
+'yellow': (0, 255, 217)}
+
+
+camera = cv2.VideoCapture(0)
+while True:
+# leia o vídeo em tempo real
+    _, frame = camera.read()
+# redimensiona o quadro
+    frame = imutils.resize(frame, width=600)
+# converte para HSV
+    hsv = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)
+
+
+    for key, value in upper.items():
+        kernel = np.ones((9, 9), np.uint8)
+        mask = cv2.inRange(hsv, lower[key], upper[key])
+        mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
+        mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
+
+
+# encontre contornos na máscara e inicialize o atual
+    
+    cnts = cv2.findContours(mask.copy(), cv2.RETR_EXTERNAL,
+    cv2.CHAIN_APPROX_SIMPLE)[-2]
+    center = None
+
+    # só prossiga se pelo menos um contorno for encontrado
+    if len(cnts) > 0:
+            # encontre o maior contorno da máscara e use
+            # isso para calcular o círculo envolvente mínimo e
+            # centróide
+        c = max(cnts, key=cv2.contourArea)
+        ((x, y), radius) = cv2.minEnclosingCircle(c)
+        M = cv2.moments(c)
+        center = (int(M["m10"] / M["m00"]), int(M["m01"] / M["m00"]))
+
+           # só prossiga se o raio atingir um tamanho mínimo. Corrija este valor para o tamanho do seu objeto
+        if radius > 0.1:
+                #desenhe o círculo e o centróide no quadro,
+                # então atualize a lista de pontos rastreados
+            cv2.circle(frame, (int(x), int(y)), int(radius), colors[key], 2)
+            cv2.putText(frame, key + " object", (int(x-radius), int(y - radius)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, colors[key], 2)
+            print('detectado')
+
+    # mostra o quadro na nossa tela
+    cv2.imshow("Frame", frame)
+
+    key = cv2.waitKey(1) & 0xFF
+    # se 'q' é pressionado pare o loop
+    if key == ord("q"):
+        break
+
+camera.release()
+cv2.destroyAllWindows()
